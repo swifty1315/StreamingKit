@@ -40,7 +40,9 @@
 #import <netdb.h>
 #import "mach/mach_time.h"
 #import <Foundation/Foundation.h>
+#if TARGET_OS_IOS
 #import <SystemConfiguration/SystemConfiguration.h>
+#endif
 #import "STKAutoRecoveringHTTPDataSource.h"
 
 #define DEFAULT_WATCHDOG_PERIOD_SECONDS (8)
@@ -68,14 +70,17 @@ static uint64_t GetTickCount(void)
     NSTimer* timeoutTimer;
     BOOL waitingForNetwork;
     uint64_t ticksWhenLastDataReceived;
+#if TARGET_OS_IOS
     SCNetworkReachabilityRef reachabilityRef;
     STKAutoRecoveringHTTPDataSourceOptions options;
+#endif
 }
 
 -(void) reachabilityChanged;
 
 @end
 
+#if TARGET_OS_IOS
 static void ReachabilityCallback(SCNetworkReachabilityRef target, SCNetworkReachabilityFlags flags, void* info)
 {
     @autoreleasepool
@@ -85,6 +90,7 @@ static void ReachabilityCallback(SCNetworkReachabilityRef target, SCNetworkReach
         [dataSource reachabilityChanged];
     }
 }
+#endif
 
 static void PopulateOptionsWithDefault(STKAutoRecoveringHTTPDataSourceOptions* options)
 {
@@ -113,11 +119,14 @@ static void PopulateOptionsWithDefault(STKAutoRecoveringHTTPDataSourceOptions* o
     return [self initWithHTTPDataSource:(STKHTTPDataSource*)innerDataSource];
 }
 
+#if TARGET_OS_IOS
 -(instancetype) initWithHTTPDataSource:(STKHTTPDataSource*)innerDataSourceIn
 {
     return [self initWithHTTPDataSource:innerDataSourceIn andOptions:(STKAutoRecoveringHTTPDataSourceOptions){}];
 }
+#endif
 
+#if TARGET_OS_IOS
 -(instancetype) initWithHTTPDataSource:(STKHTTPDataSource*)innerDataSourceIn andOptions:(STKAutoRecoveringHTTPDataSourceOptions)optionsIn
 {
     if (self = [super initWithDataSource:innerDataSourceIn]) {
@@ -132,7 +141,9 @@ static void PopulateOptionsWithDefault(STKAutoRecoveringHTTPDataSourceOptions* o
     
     return self;
 }
+#endif
 
+#if TARGET_OS_IOS
 -(BOOL) startNotifierOnRunLoop:(NSRunLoop*)runLoop
 {
     if (reachabilityRef) {
@@ -146,11 +157,14 @@ static void PopulateOptionsWithDefault(STKAutoRecoveringHTTPDataSourceOptions* o
     }
     return NO;
 }
+#endif
 
 -(BOOL) registerForEvents:(NSRunLoop*)runLoop
 {
     [super registerForEvents:runLoop];
+#if TARGET_OS_IOS
     [self startNotifierOnRunLoop:runLoop];
+#endif
     
     if (timeoutTimer)
     {
@@ -160,7 +174,9 @@ static void PopulateOptionsWithDefault(STKAutoRecoveringHTTPDataSourceOptions* o
     
 	ticksWhenLastDataReceived = GetTickCount();
 	
+#if TARGET_OS_IOS
     [self createTimeoutTimer];
+#endif
     
     return YES;
 }
@@ -181,6 +197,7 @@ static void PopulateOptionsWithDefault(STKAutoRecoveringHTTPDataSourceOptions* o
         {
             uint64_t currentTicks = GetTickCount();
             
+#if TARGET_OS_IOS
             if (((currentTicks - ticksWhenLastDataReceived) / 1000) >= options.inactivePeriodBeforeReconnectSeconds)
             {
                 serial++;
@@ -189,10 +206,12 @@ static void PopulateOptionsWithDefault(STKAutoRecoveringHTTPDataSourceOptions* o
                 
                 [self attemptReconnectWithSerial:@(serial)];
             }
+#endif
         }
     }
 }
 
+#if TARGET_OS_IOS
 -(void) createTimeoutTimer
 {
     [self destroyTimeoutTimer];
@@ -208,6 +227,7 @@ static void PopulateOptionsWithDefault(STKAutoRecoveringHTTPDataSourceOptions* o
     
     [runLoop addTimer:timeoutTimer forMode:NSRunLoopCommonModes];
 }
+#endif
 
 -(void) destroyTimeoutTimer
 {
@@ -220,15 +240,18 @@ static void PopulateOptionsWithDefault(STKAutoRecoveringHTTPDataSourceOptions* o
 
 -(void) stopNotifier
 {
+#if TARGET_OS_IOS
     if (reachabilityRef != NULL)
     {
         SCNetworkReachabilitySetCallback(reachabilityRef, NULL, NULL);
         SCNetworkReachabilityUnscheduleFromRunLoop(reachabilityRef, [self.innerDataSource.eventsRunLoop getCFRunLoop], kCFRunLoopDefaultMode);
     }
+#endif
 }
 
 -(BOOL) hasGotNetworkConnection
 {
+#if TARGET_OS_IOS
     SCNetworkReachabilityFlags flags;
     
     if (! reachabilityRef) return YES; // Assume reachability, if unknown
@@ -237,6 +260,7 @@ static void PopulateOptionsWithDefault(STKAutoRecoveringHTTPDataSourceOptions* o
     {
         return ((flags & kSCNetworkReachabilityFlagsReachable) != 0);
     }
+#endif
     
     return NO;
 }
@@ -265,10 +289,12 @@ static void PopulateOptionsWithDefault(STKAutoRecoveringHTTPDataSourceOptions* o
     
     [NSObject cancelPreviousPerformRequestsWithTarget:self];
     
+#if TARGET_OS_IOS
     if (reachabilityRef!= NULL)
     {
         CFRelease(reachabilityRef);
     }
+#endif
 }
 
 -(void) reachabilityChanged

@@ -42,6 +42,7 @@
 {
     double retval;
     
+#if TARGET_OS_IOS
     if (packetDuration > 0)
 	{
 		if (processedPacketsCount > STK_BIT_RATE_ESTIMATION_MIN_PACKETS_PREFERRED || (audioStreamBasicDescription.mBytesPerFrame == 0 && processedPacketsCount > STK_BIT_RATE_ESTIMATION_MIN_PACKETS_MIN))
@@ -55,6 +56,7 @@
 	}
 	
     retval = (audioStreamBasicDescription.mBytesPerFrame * audioStreamBasicDescription.mSampleRate) * 8;
+#endif
     
     return retval;
 }
@@ -97,6 +99,7 @@
     }
 }
 
+#if TARGET_OS_IOS
 -(BOOL) isDefinitelyCompatible:(AudioStreamBasicDescription*)basicDescription
 {
     if (self->audioStreamBasicDescription.mSampleRate == 0)
@@ -106,7 +109,9 @@
     
     return (memcmp(&(self->audioStreamBasicDescription), basicDescription, sizeof(*basicDescription)) == 0);
 }
+#endif
 
+#if TARGET_OS_IOS
 -(Float64) progressInFrames
 {
     setLock(&self->spinLock);
@@ -115,6 +120,7 @@
     
     return retval;
 }
+#endif
 
 -(NSString*) description
 {

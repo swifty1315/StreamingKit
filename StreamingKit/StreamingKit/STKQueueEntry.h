@@ -8,7 +8,9 @@
 
 #import "STKDataSource.h"
 #import "STKSpinLock.h"
+#if TARGET_OS_IOS
 #import "AudioToolbox/AudioToolbox.h"
+#endif
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -29,7 +31,9 @@ NS_ASSUME_NONNULL_BEGIN
     volatile SInt64 lastFrameQueued;
     volatile int processedPacketsCount;
 	volatile int processedPacketsSizeTotal;
+#if TARGET_OS_IOS
     AudioStreamBasicDescription audioStreamBasicDescription;
+#endif
     double durationHint;
 }
 
@@ -43,7 +47,9 @@ NS_ASSUME_NONNULL_BEGIN
 -(double) duration;
 -(Float64) progressInFrames;
 -(double) calculatedBitRate;
+#if TARGET_OS_IOS
 -(BOOL) isDefinitelyCompatible:(AudioStreamBasicDescription*)basicDescription;
+#endif
 
 @end
 

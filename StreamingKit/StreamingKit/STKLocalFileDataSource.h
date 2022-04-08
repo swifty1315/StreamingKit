@@ -38,7 +38,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface STKLocalFileDataSource : STKCoreFoundationDataSource
 
+#if TARGET_OS_IOS
 +(AudioFileTypeID) audioFileTypeHintFromFileExtension:(NSString*)fileExtension;
+#endif
 @property (readonly, copy) NSString* filePath;
 -(instancetype) initWithFilePath:(NSString*)filePath;
 

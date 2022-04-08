@@ -38,9 +38,11 @@
 #import <Foundation/Foundation.h>
 #import <pthread.h>
 #import "STKDataSource.h"
+#if TARGET_OS_IOS
 #import <AudioToolbox/AudioToolbox.h>
+#endif
 
-#if TARGET_OS_IPHONE
+#if TARGET_OS_IOS
 #include "UIKit/UIApplication.h"
 #endif
 
@@ -182,8 +184,10 @@ typedef void(^STKFrameFilter)(UInt32 channelsPerFrame, UInt32 bytesPerFrame, UIn
 /// URLs with unrecognised schemes will return nil.
 +(STKDataSource*) dataSourceFromURL:(NSURL*)url;
 
+#if TARGET_OS_IOS
 /// Returns canonical audio format used by STKFrameFilter blocks.
 +(AudioStreamBasicDescription)canonicalAudioStreamBasicDescription;
+#endif
 
 /// Initializes a new STKAudioPlayer with the default options
 -(instancetype) init;

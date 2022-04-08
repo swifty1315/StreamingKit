@@ -33,7 +33,10 @@
 **********************************************************************************/
 
 #import <Foundation/Foundation.h>
+
+#if TARGET_OS_IOS
 #include <AudioToolbox/AudioToolbox.h>
+#endif
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -62,7 +65,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 -(void) seekToOffset:(SInt64)offset;
 -(int) readIntoBuffer:(UInt8*)buffer withSize:(int)size;
+#if TARGET_OS_IOS
 -(AudioFileTypeID) audioFileTypeHint;
+#endif
 
 @end
 

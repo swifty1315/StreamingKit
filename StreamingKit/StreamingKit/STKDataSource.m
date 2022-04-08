@@ -74,10 +74,12 @@
     return NO;
 }
 
+#if TARGET_OS_IOS
 -(AudioFileTypeID) audioFileTypeHint
 {
     return 0;
 }
+#endif
 
 -(BOOL) supportsSeek
 {

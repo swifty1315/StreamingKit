@@ -33,7 +33,9 @@
  **********************************************************************************/
 
 #import "STKAudioPlayer.h"
+#if TARGET_OS_IOS
 #import "AudioToolbox/AudioToolbox.h"
+#endif
 #import "STKHTTPDataSource.h"
 #import "STKAutoRecoveringHTTPDataSource.h"
 #import "STKLocalFileDataSource.h"
@@ -199,6 +201,7 @@ STKAudioPlayerInternalState;
 
 static UInt32 maxFramesPerSlice = 4096;
 
+#if TARGET_OS_IOS
 static AudioComponentDescription mixerDescription;
 static AudioComponentDescription nbandUnitDescription;
 static AudioComponentDescription outputUnitDescription;
@@ -206,6 +209,7 @@ static AudioComponentDescription convertUnitDescription;
 static AudioComponentDescription playbackRateUnitDescription;
 static AudioStreamBasicDescription canonicalAudioStreamBasicDescription;
 static AudioStreamBasicDescription recordAudioStreamBasicDescription;
+#endif
 
 @interface STKAudioPlayer()
 {
@@ -226,6 +230,7 @@ static AudioStreamBasicDescription recordAudioStreamBasicDescription;
 
     NSMutableArray* converterNodes;
 
+#if TARGET_OS_IOS
 	AUGraph audioGraph;
     AUNode eqNode;
 	AUNode mixerNode;
@@ -241,7 +246,8 @@ static AudioStreamBasicDescription recordAudioStreamBasicDescription;
 	AudioComponentInstance mixerUnit;
 	AudioComponentInstance playbackRateUnit;
 	AudioComponentInstance outputUnit;
-		
+#endif
+    
     UInt32 eqBandCount;
     int32_t waitingForDataAfterSeekFrameCount;
 	
@@ -262,29 +268,39 @@ static AudioStreamBasicDescription recordAudioStreamBasicDescription;
     volatile UInt32 pcmBufferUsedFrameCount;
     volatile UInt32 pcmBufferFrameSizeInBytes;
     
+#if TARGET_OS_IOS
     AudioBuffer* pcmAudioBuffer;
     AudioBufferList pcmAudioBufferList;
     AudioConverterRef audioConverterRef;
 
     AudioStreamBasicDescription audioConverterAudioStreamBasicDescription;
+#endif
     
 	BOOL deallocating;
     BOOL discontinuous;
 	NSArray* frameFilters;
     NSThread* playbackThread;
     NSRunLoop* playbackThreadRunLoop;
+#if TARGET_OS_IOS
     AudioFileStreamID audioFileStream;
+#endif
     NSConditionLock* threadStartedLock;
     NSConditionLock* threadFinishedCondLock;
     
+#if TARGET_OS_IOS
     AudioFileID recordAudioFileId;
+#endif
     UInt32 recordFilePacketPosition;
+#if TARGET_OS_IOS
     AudioConverterRef recordAudioConverterRef;
+#endif
     UInt32 recordOutputBufferSize;
     UInt8 *recordOutputBuffer;
     UInt32 recordPacketsPerBuffer;
     UInt32 recordPacketSize;
+#if TARGET_OS_IOS
     AudioStreamPacketDescription *recordPacketDescriptions;
+#endif
     
 	void(^stopBackBackgroundTaskBlock)(void);
     
@@ -307,28 +323,35 @@ static AudioStreamBasicDescription recordAudioStreamBasicDescription;
 @property (readwrite) STKAudioPlayerInternalState internalState;
 @property (readwrite) STKAudioPlayerInternalState stateBeforePaused;
 
+#if TARGET_OS_IOS
 -(void) handlePropertyChangeForFileStream:(AudioFileStreamID)audioFileStreamIn fileStreamPropertyID:(AudioFileStreamPropertyID)propertyID ioFlags:(UInt32*)ioFlags;
 -(void) handleAudioPackets:(const void*)inputData numberBytes:(UInt32)numberBytes numberPackets:(UInt32)numberPackets packetDescriptions:(AudioStreamPacketDescription*)packetDescriptions;
+#endif
 @end
 
+#if TARGET_OS_IOS
 static void AudioFileStreamPropertyListenerProc(void* clientData, AudioFileStreamID audioFileStream, AudioFileStreamPropertyID	propertyId, UInt32* flags)
 {
 	STKAudioPlayer* player = (__bridge STKAudioPlayer*)clientData;
     
 	[player handlePropertyChangeForFileStream:audioFileStream fileStreamPropertyID:propertyId ioFlags:flags];
 }
+#endif
 
+#if TARGET_OS_IOS
 static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UInt32 numberPackets, const void* inputData, AudioStreamPacketDescription* packetDescriptions)
 {
 	STKAudioPlayer* player = (__bridge STKAudioPlayer*)clientData;
     
 	[player handleAudioPackets:inputData numberBytes:numberBytes numberPackets:numberPackets packetDescriptions:packetDescriptions];
 }
+#endif
 
 @implementation STKAudioPlayer
 
 +(void) initialize
 {
+#if TARGET_OS_IOS
     convertUnitDescription = (AudioComponentDescription)
     {
         .componentManufacturer = kAudioUnitManufacturer_Apple,
@@ -337,6 +360,7 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
         .componentFlags = 0,
         .componentFlagsMask = 0
     };
+#endif
     
 #ifdef CA_CANONICAL_DEPRECATED
     const int bytesPerSample = sizeof(SInt16);
@@ -346,6 +370,7 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
     const int bytesPerSample = sizeof(AudioSampleType);
 #endif
 
+#if TARGET_OS_IOS
     playbackRateUnitDescription = (AudioComponentDescription)
     {
         .componentManufacturer	= kAudioUnitManufacturer_Apple,
@@ -366,7 +391,9 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
         .mBitsPerChannel = 8 * bytesPerSample,
         .mBytesPerPacket = (bytesPerSample * 2)
     };
+#endif
     
+#if TARGET_OS_IOS
 	outputUnitDescription = (AudioComponentDescription)
 	{
 		.componentType = kAudioUnitType_Output,
@@ -395,6 +422,7 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
 		.componentSubType = kAudioUnitSubType_NBandEQ,
 		.componentManufacturer=kAudioUnitManufacturer_Apple
 	};
+#endif
 }
 -(STKAudioPlayerOptions) options
 {
@@ -538,6 +566,7 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
         PopulateOptionsWithDefault(&options);
         NormalizeDisabledBuffers(&options);
         
+#if TARGET_OS_IOS
         framesRequiredToStartPlaying = canonicalAudioStreamBasicDescription.mSampleRate * options.secondsRequiredToStartPlaying;
         framesRequiredToPlayAfterRebuffering = canonicalAudioStreamBasicDescription.mSampleRate * options.secondsRequiredToStartPlayingAfterBufferUnderun;
 		framesRequiredBeforeWaitingForDataAfterSeekBecomesPlaying = canonicalAudioStreamBasicDescription.mSampleRate * options.gracePeriodAfterSeekInSeconds;
@@ -551,7 +580,7 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
 		
         pcmBufferFrameSizeInBytes = canonicalAudioStreamBasicDescription.mBytesPerFrame;
         pcmBufferTotalFrameCount = pcmAudioBuffer->mDataByteSize / pcmBufferFrameSizeInBytes;
-        
+#endif
         readBufferSize = options.readBufferSize;
         readBuffer = calloc(sizeof(UInt8), readBufferSize);
         
@@ -607,6 +636,7 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
 	
 	[self clearQueue];
 	
+#if TARGET_OS_IOS
     if (audioFileStream)
     {
         AudioFileStreamClose(audioFileStream);
@@ -627,6 +657,7 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
 		
 		audioGraph = nil;
     }
+#endif
 }
 
 -(void) dealloc
@@ -643,12 +674,14 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
     pthread_cond_destroy(&mainThreadSyncCallReadyCondition);
     
     free(readBuffer);
+#if TARGET_OS_IOS
     free(pcmAudioBufferList.mBuffers[0].mData);
+#endif
 }
 
 -(void) startSystemBackgroundTask
 {
-#if TARGET_OS_IPHONE
+#if TARGET_OS_IOS
 	__block UIBackgroundTaskIdentifier backgroundTaskId = UIBackgroundTaskInvalid;
 	
 	backgroundTaskId = [[UIApplication sharedApplication] beginBackgroundTaskWithExpirationHandler:^
@@ -695,10 +728,12 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
     return retval;
 }
 
+#if TARGET_OS_IOS
 + (AudioStreamBasicDescription)canonicalAudioStreamBasicDescription
 {
   return canonicalAudioStreamBasicDescription;
 }
+#endif
 
 -(void) clearQueue
 {
@@ -831,6 +866,7 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
     [self wakeupPlaybackThread];
 }
 
+#if TARGET_OS_IOS
 -(void) handlePropertyChangeForFileStream:(AudioFileStreamID)inAudioFileStream fileStreamPropertyID:(AudioFileStreamPropertyID)inPropertyID ioFlags:(UInt32*)ioFlags
 {
 	OSStatus error;
@@ -974,13 +1010,16 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
         
     }
 }
+#endif
 
 -(Float64) currentTimeInFrames
 {
+#if TARGET_OS_IOS
     if (audioGraph == nil)
     {
         return 0;
     }
+#endif
     
     return 0;
 }
@@ -1043,35 +1082,50 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
         return 0;
     }
     
+#if TARGET_OS_IOS
     setLock(&entry->spinLock);
     double retval = entry->seekTime + (entry->framesPlayed / canonicalAudioStreamBasicDescription.mSampleRate);
     lockUnlock(&entry->spinLock);
-	
+    
     return retval;
+    
+#endif
 }
 
 -(float) rate
 {
+#if TARGET_OS_IOS
 	AudioUnitParameterValue rateValue;
 	AudioUnitGetParameter(playbackRateUnit, kNewTimePitchParam_Rate, kAudioUnitScope_Global, 0, &rateValue);
 	return rateValue;
+#else
+    return 1;
+#endif
 }
 
 -(void) setRate:(float)rate
 {
+#if TARGET_OS_IOS
 	AudioUnitSetParameter(playbackRateUnit, kNewTimePitchParam_Rate, kAudioUnitScope_Global, 0, rate, 0);
+#endif
 }
 
 -(float) overlap
 {
+#if TARGET_OS_IOS
 	AudioUnitParameterValue overlapValue;
 	AudioUnitGetParameter(playbackRateUnit, kNewTimePitchParam_Overlap, kAudioUnitScope_Global, 0, &overlapValue);
 	return overlapValue;
+#else
+    return 0;
+#endif
 }
 
 -(void) setOverlap:(float)overlap
 {
+#if TARGET_OS_IOS
 	AudioUnitSetParameter(playbackRateUnit, kNewTimePitchParam_Overlap, kAudioUnitScope_Global, 0, overlap, 0);
+#endif
 }
 
 -(BOOL) invokeOnPlaybackThread:(void(^)(void))block
@@ -1163,6 +1217,7 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
 {
     LOGINFO(([entry description]));
 
+#if TARGET_OS_IOS
     if (startPlaying)
     {
         memset(&pcmAudioBuffer->mData[0], 0, pcmBufferTotalFrameCount * pcmBufferFrameSizeInBytes);
@@ -1174,6 +1229,7 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
         
         audioFileStream = 0;
     }
+#endif
     
     if (currentlyReadingEntry)
     {
@@ -1219,7 +1275,11 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
     LOGINFO(([NSString stringWithFormat:@"Finished: %@, Next: %@, buffering.count=%d,upcoming.count=%d", entry ? [entry description] : @"nothing", [next description], (int)bufferingQueue.count, (int)upcomingQueue.count]));
     
     NSObject* queueItemId = entry.queueItemId;
-    double progress = [entry progressInFrames] / canonicalAudioStreamBasicDescription.mSampleRate;
+    double rate = 1.0;
+#if TARGET_OS_IOS
+    rate = canonicalAudioStreamBasicDescription.mSampleRate
+#endif
+    double progress = [entry progressInFrames] / rate;
     double duration = [entry duration];
     
     BOOL isPlayingSameItemProbablySeek = currentlyPlayingEntry == next;
@@ -1533,6 +1593,7 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
     
     double calculatedBitRate = [currentEntry calculatedBitRate];
     
+#if TARGET_OS_IOS
     if (currentEntry->packetDuration > 0 && calculatedBitRate > 0)
     {
         UInt32 ioFlags = 0;
@@ -1574,6 +1635,7 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
     {
         [self resetPcmBuffers];
     }
+#endif
 }
 
 -(void) dataSourceDataAvailable:(STKDataSource*)dataSourceIn
@@ -1597,6 +1659,7 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
         return;
     }
     
+#if TARGET_OS_IOS
     if (audioFileStream == 0)
     {
         error = AudioFileStreamOpen((__bridge void*)self, AudioFileStreamPropertyListenerProc, AudioFileStreamPacketsProc, dataSourceIn.audioFileTypeHint, &audioFileStream);
@@ -1652,6 +1715,7 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
         
         lockUnlock(&currentEntryReferencesLock);
     }
+#endif
 }
 
 -(void) dataSourceErrorOccured:(STKDataSource*)dataSourceIn
@@ -1734,6 +1798,7 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
             self.stateBeforePaused = self.internalState;
             self.internalState = STKAudioPlayerInternalStatePaused;
             
+#if TARGET_OS_IOS
             if (audioGraph)
             {
                 error = AUGraphStop(audioGraph);
@@ -1747,6 +1812,7 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
                     return;
                 }
             }
+#endif
             
             [self wakeupPlaybackThread];
         }
@@ -1769,6 +1835,7 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
                 [self resetPcmBuffers];
             }
 
+#if TARGET_OS_IOS
             if (audioGraph != nil)
             {
 				error = AUGraphStart(audioGraph);
@@ -1782,6 +1849,7 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
                     return;
                 }
             }
+#endif
             
             [self wakeupPlaybackThread];
         }
@@ -1912,6 +1980,7 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
 
 -(void) closeRecordAudioFile
 {
+#if TARGET_OS_IOS
     if (recordAudioFileId)
     {
         AudioFileClose(recordAudioFileId);
@@ -1935,6 +2004,7 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
         free(recordPacketDescriptions);
         recordPacketDescriptions = NULL;
     }
+#endif
     
     recordFilePacketPosition = 0;
 }
@@ -1965,9 +2035,9 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
     return retval;
 }
 
+#if TARGET_OS_IOS
 static BOOL GetHardwareCodecClassDesc(UInt32 formatId, AudioClassDescription* classDesc)
 {
-#if TARGET_OS_IPHONE
     UInt32 size;
 	    
     if (AudioFormatGetPropertyInfo(kAudioFormatProperty_Decoders, sizeof(formatId), &formatId, &size) != 0)
@@ -1992,21 +2062,24 @@ static BOOL GetHardwareCodecClassDesc(UInt32 formatId, AudioClassDescription* cl
             return YES;
         }
     }
-#endif
     
     return NO;
 }
+#endif
 
 -(void) destroyAudioConverter
 {
+#if TARGET_OS_IOS
     if (audioConverterRef)
     {
         AudioConverterDispose(audioConverterRef);
         
         audioConverterRef = nil;
     }
+#endif
 }
 
+#if TARGET_OS_IOS
 -(void) createAudioConverter:(AudioStreamBasicDescription*)asbd
 {
     OSStatus status;
@@ -2182,11 +2255,13 @@ static BOOL GetHardwareCodecClassDesc(UInt32 formatId, AudioClassDescription* cl
         }
     }
 }
+#endif
 
 -(void) createPlaybackRateUnit
 {
     OSStatus status;
     
+#if TARGET_OS_IOS
     CHECK_STATUS_AND_RETURN(AUGraphAddNode(audioGraph, &playbackRateUnitDescription, &playbackRateNode));
     CHECK_STATUS_AND_RETURN(AUGraphNodeInfo(audioGraph, playbackRateNode, &playbackRateUnitDescription, &playbackRateUnit));
     
@@ -2197,12 +2272,13 @@ static BOOL GetHardwareCodecClassDesc(UInt32 formatId, AudioClassDescription* cl
 #endif
     
   CHECK_STATUS_AND_RETURN(AudioUnitSetProperty(playbackRateUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, kOutputBus, &canonicalAudioStreamBasicDescription, sizeof(canonicalAudioStreamBasicDescription)));
+#endif
 }
 
 -(void) createOutputUnit
 {
 	OSStatus status;
-	
+#if TARGET_OS_IOS
 	CHECK_STATUS_AND_RETURN(AUGraphAddNode(audioGraph, &outputUnitDescription, &outputNode));
 	CHECK_STATUS_AND_RETURN(AUGraphNodeInfo(audioGraph, outputNode, &outputUnitDescription, &outputUnit));
 	
@@ -2217,6 +2293,7 @@ static BOOL GetHardwareCodecClassDesc(UInt32 formatId, AudioClassDescription* cl
 #endif
     
     CHECK_STATUS_AND_RETURN(AudioUnitSetProperty(outputUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, kOutputBus, &canonicalAudioStreamBasicDescription, sizeof(canonicalAudioStreamBasicDescription)));
+#endif
 }
 
 -(void) createMixerUnit
@@ -2228,6 +2305,7 @@ static BOOL GetHardwareCodecClassDesc(UInt32 formatId, AudioClassDescription* cl
 		return;
 	}
 	
+#if TARGET_OS_IOS
 	CHECK_STATUS_AND_RETURN(AUGraphAddNode(audioGraph, &mixerDescription, &mixerNode));
 	CHECK_STATUS_AND_RETURN(AUGraphNodeInfo(audioGraph, mixerNode, &mixerDescription, &mixerUnit));
 	CHECK_STATUS_AND_RETURN(AudioUnitSetProperty(mixerUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFramesPerSlice, sizeof(maxFramesPerSlice)));
@@ -2240,6 +2318,7 @@ static BOOL GetHardwareCodecClassDesc(UInt32 formatId, AudioClassDescription* cl
 	
 	CHECK_STATUS_AND_RETURN(AudioUnitSetProperty(mixerUnit, kAudioUnitProperty_SampleRate, kAudioUnitScope_Output, 0, &graphSampleRate, sizeof(graphSampleRate)));
 	CHECK_STATUS_AND_RETURN(AudioUnitSetParameter(mixerUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, 0, 1.0, 0));
+#endif
 }
 
 -(void) createEqUnit
@@ -2253,7 +2332,7 @@ static BOOL GetHardwareCodecClassDesc(UInt32 formatId, AudioClassDescription* cl
     {
 		return;
 	}
-	
+#if TARGET_OS_IOS
 	CHECK_STATUS_AND_RETURN(AUGraphAddNode(audioGraph, &nbandUnitDescription, &eqNode));
 	CHECK_STATUS_AND_RETURN(AUGraphNodeInfo(audioGraph, eqNode, NULL, &eqUnit));
 	CHECK_STATUS_AND_RETURN(AudioUnitSetProperty(eqUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFramesPerSlice, sizeof(maxFramesPerSlice)));
@@ -2275,20 +2354,25 @@ static BOOL GetHardwareCodecClassDesc(UInt32 formatId, AudioClassDescription* cl
 		CHECK_STATUS_AND_RETURN(AudioUnitSetParameter(eqUnit, kAUNBandEQParam_BypassBand + i, kAudioUnitScope_Global, 0, (AudioUnitParameterValue)0, 0));
 	}
 #endif
+#endif
 }
 
 -(void) setGain:(float)gain forEqualizerBand:(int)bandIndex
 {
+#if TARGET_OS_IOS
 	if (!eqUnit)
 	{
 		return;
 	}
     
+    
     OSStatus status;
 	
 	CHECK_STATUS_AND_RETURN(AudioUnitSetParameter(eqUnit, kAUNBandEQParam_Gain + bandIndex, kAudioUnitScope_Global, 0, gain, 0));
+#endif
 }
 
+#if TARGET_OS_IOS
 -(AUNode) createConverterNode:(AudioStreamBasicDescription)srcFormat desFormat:(AudioStreamBasicDescription)desFormat
 {
 	OSStatus status;
@@ -2366,12 +2450,14 @@ static BOOL GetHardwareCodecClassDesc(UInt32 formatId, AudioClassDescription* cl
 		CHECK_STATUS_AND_RETURN(AUGraphSetNodeInputCallback(audioGraph, firstNode, 0, &callbackStruct));
 	}
 }
+#endif
 
 -(void) createAudioGraph
 {
     OSStatus status;
     converterNodes = [[NSMutableArray alloc] init];
     
+#if TARGET_OS_IOS
 	CHECK_STATUS_AND_RETURN(NewAUGraph(&audioGraph));
 	CHECK_STATUS_AND_RETURN(AUGraphOpen(audioGraph));
 	
@@ -2383,6 +2469,7 @@ static BOOL GetHardwareCodecClassDesc(UInt32 formatId, AudioClassDescription* cl
     [self connectGraph];
 	
 	CHECK_STATUS_AND_RETURN(AUGraphInitialize(audioGraph));
+#endif
 	
 	self.volume = self->volume;
 }
@@ -2393,6 +2480,7 @@ static BOOL GetHardwareCodecClassDesc(UInt32 formatId, AudioClassDescription* cl
     NSMutableArray* nodes = [[NSMutableArray alloc] init];
     NSMutableArray* units = [[NSMutableArray alloc] init];
     
+#if TARGET_OS_IOS
     AUGraphClearConnections(audioGraph);
     
     for (NSNumber* converterNode in converterNodes)
@@ -2450,6 +2538,7 @@ static BOOL GetHardwareCodecClassDesc(UInt32 formatId, AudioClassDescription* cl
         
         [self connectNodes:srcNode desNode:desNode srcUnit:srcUnit desUnit:desUnit];
     }
+#endif
 }
 
 -(BOOL) audioGraphIsRunning
@@ -2457,13 +2546,15 @@ static BOOL GetHardwareCodecClassDesc(UInt32 formatId, AudioClassDescription* cl
 	OSStatus status;
 	Boolean isRunning;
     
+#if TARGET_OS_IOS
     status = AUGraphIsRunning(audioGraph, &isRunning);
 
 	if (status)
 	{
 		return NO;
 	}
-	
+#endif
+    
 	return isRunning;
 }
 
@@ -2478,6 +2569,7 @@ static BOOL GetHardwareCodecClassDesc(UInt32 formatId, AudioClassDescription* cl
         return NO;
     }
 	
+#if TARGET_OS_IOS
     status = AUGraphStart(audioGraph);
     
     if (status)
@@ -2486,6 +2578,7 @@ static BOOL GetHardwareCodecClassDesc(UInt32 formatId, AudioClassDescription* cl
         
         return NO;
     }
+#endif
 	
 	[self stopSystemBackgroundTask];
 	
@@ -2496,6 +2589,7 @@ static BOOL GetHardwareCodecClassDesc(UInt32 formatId, AudioClassDescription* cl
 {
 	OSStatus status;
 	
+#if TARGET_OS_IOS
 	if (!audioGraph)
     {
         stopReason = stopReasonIn;
@@ -2526,13 +2620,14 @@ static BOOL GetHardwareCodecClassDesc(UInt32 formatId, AudioClassDescription* cl
     {
         [self unexpectedError:STKAudioPlayerErrorAudioSystemError];
     }
-    
+#endif
     [self resetPcmBuffers];
     
     stopReason = stopReasonIn;
     self.internalState = STKAudioPlayerInternalStateStopped;
 }
 
+#if TARGET_OS_IOS
 typedef struct
 {
     BOOL done;
@@ -2833,7 +2928,9 @@ OSStatus AudioConverterCallback(AudioConverterRef inAudioConverter, UInt32* ioNu
         }
     }
 }
+#endif
 
+#if TARGET_OS_IOS
 - (void)handleRecordingOfAudioPackets:(UInt32)numberOfPackets audioBuffer:(AudioBuffer *)audioBuffer
 {
     if (recordAudioFileId && recordAudioConverterRef)
@@ -2893,7 +2990,9 @@ OSStatus AudioConverterCallback(AudioConverterRef inAudioConverter, UInt32* ioNu
         }
     }
 }
+#endif
 
+#if TARGET_OS_IOS
 static OSStatus OutputRenderCallback(void* inRefCon, AudioUnitRenderActionFlags* ioActionFlags, const AudioTimeStamp* inTimeStamp, UInt32 inBusNumber, UInt32 inNumberFrames, AudioBufferList* ioData)
 {
     STKAudioPlayer* audioPlayer = (__bridge STKAudioPlayer*)inRefCon;
@@ -3190,6 +3289,7 @@ static OSStatus OutputRenderCallback(void* inRefCon, AudioUnitRenderActionFlags*
     
     return 0;
 }
+#endif
 
 -(NSArray*) pendingQueue
 {
@@ -3255,41 +3355,46 @@ static OSStatus OutputRenderCallback(void* inRefCon, AudioUnitRenderActionFlags*
 
 -(float) peakPowerInDecibelsForChannel:(NSUInteger)channelNumber
 {
+#if TARGET_OS_IOS
 	if (channelNumber >= canonicalAudioStreamBasicDescription.mChannelsPerFrame)
 	{
 		return 0;
 	}
+#endif
 	
 	return peakPowerDb[channelNumber];
 }
 
 -(void) setPeakPowerInDecibelsForChannel:(NSUInteger)channelNumber andPower: (Float32)power
 {
+#if TARGET_OS_IOS
     if (channelNumber >= canonicalAudioStreamBasicDescription.mChannelsPerFrame)
     {
         return;
     }
-    
+#endif
     peakPowerDb[channelNumber] = power;
 }
 
 -(float) averagePowerInDecibelsForChannel:(NSUInteger)channelNumber
 {
+#if TARGET_OS_IOS
 	if (channelNumber >= canonicalAudioStreamBasicDescription.mChannelsPerFrame)
 	{
 		return 0;
 	}
-	
+#endif
 	return averagePowerDb[channelNumber];
 }
 
 -(void) setAveragePowerInDecibelsForChannel:(NSUInteger)channelNumber andPower: (Float32)power
 {
+#if TARGET_OS_IOS
     if (channelNumber >= canonicalAudioStreamBasicDescription.mChannelsPerFrame)
     {
         return;
     }
-    
+#endif
     averagePowerDb[channelNumber] = power;
 }
 
@@ -3505,10 +3610,12 @@ static OSStatus OutputRenderCallback(void* inRefCon, AudioUnitRenderActionFlags*
 	self->volume = value;
 	
 #if (TARGET_OS_IPHONE)
+#if TARGET_OS_IOS
 	if (self->mixerNode)
 	{
 		AudioUnitSetParameter(self->mixerUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Output, 0, self->volume, 0);
 	}
+#endif
 #else
 	if (self->mixerNode)
 	{

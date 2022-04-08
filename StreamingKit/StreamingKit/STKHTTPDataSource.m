@@ -61,7 +61,9 @@
     NSURL* currentUrl;
     STKAsyncURLProvider asyncUrlProvider;
     NSDictionary* httpHeaders;
+#if TARGET_OS_IOS
     AudioFileTypeID audioFileTypeHint;
+#endif
     NSDictionary* requestHeaders;
 }
 -(void) open;
@@ -93,6 +95,7 @@
     }];
 }
 
+#if TARGET_OS_IOS
 -(instancetype) initWithAsyncURLProvider:(STKAsyncURLProvider)asyncUrlProviderIn
 {
     if (self = [super init])
@@ -108,6 +111,7 @@
     
     return self;
 }
+#endif
 
 -(void) dealloc
 {
@@ -119,6 +123,7 @@
     return self->currentUrl;
 }
 
+#if TARGET_OS_IOS
 +(AudioFileTypeID) audioFileTypeHintFromMimeType:(NSString*)mimeType
 {
     static dispatch_once_t onceToken;
@@ -170,6 +175,7 @@
 {
     return audioFileTypeHint;
 }
+#endif
 
 -(NSDictionary*) parseIceHeader:(NSData*)headerData
 {
@@ -217,6 +223,7 @@
 
 -(BOOL) parseHttpHeader
 {
+#if TARGET_OS_IOS
     if (!httpHeaderNotAvailable)
     {
         CFTypeRef response = CFReadStreamCopyProperty(stream, kCFStreamPropertyHTTPResponseHeader);
@@ -375,6 +382,7 @@
         
         return NO;
     }
+#endif
     
     return YES;
 }
@@ -579,6 +587,7 @@
 
 -(void) openForSeek:(BOOL)forSeek
 {
+#if TARGET_OS_IOS
 	int localRequestSerialNumber;
 	
 	requestSerialNumber++;
@@ -675,6 +684,7 @@
         
         CFRelease(message);
     });
+#endif
 }
 
 -(UInt32) httpStatusCode

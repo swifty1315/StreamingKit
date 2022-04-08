@@ -38,7 +38,9 @@
 {
     SInt64 position;
     SInt64 length;
+#if TARGET_OS_IOS
     AudioFileTypeID audioFileTypeHint;
+#endif
 }
 @property (readwrite, copy) NSString* filePath;
 -(void) open;
@@ -53,12 +55,15 @@
     {
         self.filePath = filePathIn;
         
+#if TARGET_OS_IOS
         audioFileTypeHint = [STKLocalFileDataSource audioFileTypeHintFromFileExtension:filePathIn.pathExtension];
+#endif
     }
     
     return self;
 }
 
+#if TARGET_OS_IOS
 +(AudioFileTypeID) audioFileTypeHintFromFileExtension:(NSString*)fileExtension
 {
     static dispatch_once_t onceToken;
@@ -90,11 +95,14 @@
     
     return (AudioFileTypeID)number.intValue;
 }
+#endif
 
+#if TARGET_OS_IOS
 -(AudioFileTypeID) audioFileTypeHint
 {
     return audioFileTypeHint;
 }
+#endif
 
 -(void) dealloc
 {
