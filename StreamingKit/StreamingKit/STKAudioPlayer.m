@@ -1277,7 +1277,7 @@ static void AudioFileStreamPacketsProc(void* clientData, UInt32 numberBytes, UIn
     NSObject* queueItemId = entry.queueItemId;
     double rate = 1.0;
 #if TARGET_OS_IOS
-    rate = canonicalAudioStreamBasicDescription.mSampleRate
+    rate = canonicalAudioStreamBasicDescription.mSampleRate;
 #endif
     double progress = [entry progressInFrames] / rate;
     double duration = [entry duration];
